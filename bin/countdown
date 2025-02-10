@@ -1,0 +1,160 @@
+#!/usr/bin/env perl
+
+use strictures version => 2;
+
+use Getopt::Long ();
+use Pod::Usage   ();
+use Time::Piece;
+use Time::Seconds;
+
+my $VERSION = '1.000';
+
+my %opt = (
+    to      => undef,
+    in      => [],
+    version => undef,
+    help    => undef,
+);
+
+Getopt::Long::GetOptions(
+    \%opt,
+    'to=s',
+    'in=s',
+    'version',
+    'help'
+);
+
+if ( $opt{help} ) {
+    Pod::Usage::pod2usage( -verbose => 2, -exitval => 0 );
+}
+
+if ( $opt{version} ) {
+    print "version $VERSION\n";
+    exit;
+}
+
+# rudimentary iso date verification
+if ( !$opt{to} || $opt{to} !~ /^\d{4}-\d{2}-\d{2}$/ ) {
+    Pod::Usage::pod2usage( -msg => 'Option to must be ISO format <YYYY-MM-DD>', -verbose => 0, -exitval => 1 );
+}
+
+my @output_options = qw{ seconds minutes hours days };
+
+if ( scalar @{ $opt{in} } ) {
+    foreach my $opt ( @{ $opt{in} } ) {
+        if ( !grep { lc $opt eq $_ } @output_options ) {
+            Pod::Usage::pod2usage( -msg => "Option in $opt is unknown", -verbose => 0, -exitval => 1 );
+        }
+    }
+}
+else {
+    # default to showing all of the output options
+    $opt{in} = \@output_options;
+}
+
+my $today = localtime->epoch;
+my $to    = localtime->strptime( $opt{to}, '%Y-%m-%d' );
+
+my $difference = $to - $today;
+
+my %in = ();
+$in{seconds} = $difference->epoch;
+$in{minutes} = $in{seconds} / 60;
+$in{hours}   = $in{minutes} / 60;
+$in{days}    = $in{hours} / 24;
+
+my $past = ( $in{seconds} < 0 ? 1 : 0 );
+
+print 'There ' . ( $past ? 'have been ' : 'are ' );
+
+my @output;
+foreach my $in_opt ( @{ $opt{in} } ) {
+    $in_opt = lc $in_opt;
+
+    my $number = ( $past ? -$in{$in_opt} : $in{$in_opt} );
+    my $out .= sprintf '%.0f', $number;
+    $out .= " $in_opt";
+
+    push @output, $out;
+}
+
+print '' . ( join ' or ', @output )
+         . ( $past ? ' since ' : ' until ' )
+         . $opt{to};
+
+__END__
+
+=pod
+
+=head1 NAME
+
+countdown - print how many until a date
+
+=head1 SYNOPSIS
+
+ countdown [--to <YYYY-MM-DD>]
+           [--in <seconds, minutes, hours, days>]
+           [--version]
+           [--help]
+
+=head1 OPTIONS
+
+=over
+
+=item --to <YYYY-MM-DD>
+
+Print days until <YYYY-MM-DD>
+
+=item --in <seconds, minutes, hours, days>
+
+Print how many in seconds, minutes, hours, or days
+
+=item --version
+
+Print the version and exit
+
+=item --help
+
+Print this dialogue
+
+=back
+
+=head1 DESCRIPTION
+
+C<countdown> is a program that prints how many <seconds, minutes, hours, days> there are (or have been) until (or since) a defined date.
+
+=head1 EXAMPLES
+
+=over
+
+=item Print the seconds, minutes, hours, and days until January 20, 2029.
+
+ $ countdown --to 2029-01-20
+ There are 124423849 seconds or 2073730 minutes or 34562 hours or 1440 days until 2029-01-20
+
+=item Print the days until January 20, 2029.
+
+ $ countdown --to 2029-01-20 --in days
+ There are 1440 days until 2029-01-20
+
+=item Print the minutes, days until January 20, 2029.
+
+ $ countdown --to 2029-01-20 --in minutes --in days
+ There are 2073682 minutes or 1440 days until 2029-01-20
+
+=item Print the days since January 20, 2024.
+
+ $ countdown --to 2024-01-20 --in days
+ There have been 387 days since 2024-01-20
+
+=back
+
+=head1 COPYRIGHT AND LICENSE
+
+Copyright (c) 2025 Blaine Motsinger under the MIT license.
+
+=head1 AUTHOR
+
+Blaine Motsinger <blaine@renderorange.com>
+
+=cut
